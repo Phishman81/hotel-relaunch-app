@@ -66,13 +66,13 @@ def scrape_page_content(url: str) -> str:
 # 4) Haupt-App (Streamlit)
 # -------------------------------------------------------------------------
 def main():
-    st.title("Website-Relaunch Content-Mapping (OpenAI 1.14.0)")
+    st.title("Website-Relaunch Content-Mapping (o3‑mini‑high)")
 
     st.markdown("""
     **Ablauf**:
     1. Alte Seiten (URLs) eingeben -> werden gescraped.
     2. Neue Sitemap eingeben.
-    3. o3-mini-2025-01-31 (oder anderes Modell) aufrufen -> Vorschlag für Module & Felder.
+    3. o3‑mini‑high Modell aufrufen -> Vorschlag für Module & Felder.
     """)
 
     # Eingabe: Alte URLs
@@ -135,13 +135,12 @@ def main():
         try:
             with st.spinner("Frage das Modell (Stream) ..."):
                 response = openai.Chat.create(
-                    model="o3-mini-2025-01-31",   # Beispiel: o3-mini
+                    model="o3-mini-high",   # Verwende das Modell o3-mini-high
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    stream=True,  # wir wollen live den Text
-                    reasoning_effort="high",  # nur, wenn dein Modell das unterstützt
+                    stream=True,  # Live-Ausgabe des Texts
                     max_completion_tokens=500,
                     temperature=0.7
                 )
@@ -151,8 +150,6 @@ def main():
                 final_answer = ""
 
                 for chunk in response:
-                    # chunk["choices"] -> array
-                    # chunk["choices"][0]["delta"] -> dict mit partial "content"
                     delta = chunk["choices"][0]["delta"]
                     if "content" in delta:
                         final_answer += delta["content"]
@@ -162,7 +159,6 @@ def main():
 
         except Exception as e:
             st.error(f"Fehler beim OpenAI-Aufruf: {e}")
-
 
 # Start der App
 if __name__ == "__main__":
