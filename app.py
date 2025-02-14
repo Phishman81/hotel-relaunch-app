@@ -131,17 +131,17 @@ def main():
             user_prompt += txt[:3000]
             user_prompt += "\n"
 
-        # OpenAI-Aufruf mit openai.Chat.create(...)
+        # OpenAI-Aufruf mit openai.ChatCompletion.create(...)
         try:
             with st.spinner("Frage das Modell (Stream) ..."):
-                response = openai.Chat.create(
+                response = openai.ChatCompletion.create(
                     model="o3-mini-high",   # Verwende das Modell o3-mini-high
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
                     stream=True,  # Live-Ausgabe des Texts
-                    max_completion_tokens=500,
+                    max_tokens=500,
                     temperature=0.7
                 )
 
