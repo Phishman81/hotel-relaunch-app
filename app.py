@@ -4,17 +4,16 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
-# -------------------------------------------------------------------------
-# 1) Übernimmt deinen OpenAI API-Key aus den Streamlit Secrets.
-#    => Bitte in Streamlit Cloud in den Secrets hinterlegen:
-#       openai_api_key = "sk-..."
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------
+# 1) API-Key aus den Streamlit Secrets
+# ---------------------------------------------------------------
 openai.api_key = st.secrets["openai_api_key"]
 
-# -------------------------------------------------------------------------
-# 2) Hier dein vollständiges ALL_MODULES - Dictionary
-#    (1:1 aus deinem bisherigen Skript übernommen, ohne Kürzungen!)
-# -------------------------------------------------------------------------
+
+# ---------------------------------------------------------------
+# 2) Dein komplettes ALL_MODULES (ohne Kürzungen!)
+#    Aus deinem Skript übernommen.
+# ---------------------------------------------------------------
 ALL_MODULES = {
     "Bild-Text": [
         {
@@ -1236,13 +1235,12 @@ ALL_MODULES = {
 }
 
 
-# -------------------------------------------------------------------------
-# 3) Hilfsfunktion zum Auslesen / Scrapen von alten Seiten
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------
+# 3) Hilfsfunktion: Scrapen der alten Seiten (URL -> Text)
+# ---------------------------------------------------------------
 def scrape_page_content(url: str) -> str:
     """
-    Lädt eine URL und gibt den reinen Textinhalt (sichtbaren Content)
-    zurück. Hier sehr einfach gehalten (kein spezielles Token-Handling).
+    Lädt die angegebene URL und liefert den reinen Text zurück.
     """
     try:
         response = requests.get(url, timeout=10)
@@ -1256,101 +1254,102 @@ def scrape_page_content(url: str) -> str:
     return text_only.strip()
 
 
-# -------------------------------------------------------------------------
-# 4) Haupt-App in Streamlit
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------
+# 4) Haupt-App
+# ---------------------------------------------------------------
 def main():
-    st.title("Website-Relaunch Content-Mapping")
+    st.title("Website-Relaunch Content-Mapping (o3-mini-high)")
 
     st.markdown(
         """
-        **Anleitung**  
-        - Gib in das erste Feld die alten Seiten-URLs (eine pro Zeile) ein.  
-        - Gib in das zweite Feld die neuen Seiten (Sitemap) ein (eine pro Zeile).  
-        - Klicke auf "Content mapping generieren", um per KI-Vorschlag 
-          ein Mapping zu erhalten, wie Inhalte in die Module verteilt werden können.
+        **Anleitung**:
+        1. Alte Seiten-URLs (eine pro Zeile) eingeben.
+        2. Neue Sitemap (eine pro Zeile) eingeben.
+        3. Klicke auf "Content mapping generieren" -> das o3-mini Modell mit reasoning_effort=high
+           gibt dir ein Mapping, welche Module und Felder am besten genutzt werden.
         """
     )
 
-    # Eingabe: alte Seiten
+    # Eingabe: alte URLs
     st.header("1) Alte Seiten (URLs)")
     old_urls_input = st.text_area(
-        "Trage hier die alten Seiten-URLs ein (eine pro Zeile).",
-        height=150,
-        value="https://example.com/alte-seite-1\nhttps://example.com/alte-seite-2"
+        "Trage hier die alten Seiten ein:",
+        value="https://example.com/alte-seite-1\nhttps://example.com/alte-seite-2",
+        height=150
     )
 
     # Eingabe: neue Sitemap
     st.header("2) Neue Seiten (Sitemap)")
     new_sitemap_input = st.text_area(
-        "Trage hier die neuen Seiten ein (eine pro Zeile).",
-        height=150,
-        value="Startseite\nÜber uns\nZimmer\nKontakt\nDatenschutz"
+        "Trage hier die neuen Seiten ein:",
+        value="Startseite\nÜber uns\nZimmer\nKontakt\nDatenschutz",
+        height=150
     )
 
-    # Button: Mapping generieren
+    # Button zum Generieren
     if st.button("Content mapping generieren"):
         old_urls = [u.strip() for u in old_urls_input.split("\n") if u.strip()]
         new_pages = [p.strip() for p in new_sitemap_input.split("\n") if p.strip()]
 
         if not old_urls or not new_pages:
-            st.warning("Bitte mindestens 1 alte URL und 1 neue Seite eingeben!")
+            st.warning("Bitte mindestens eine alte URL und eine neue Seite angeben!")
             return
 
-        # Scraping
-        st.info("Starte Scraping der alten Seiten – bitte warten...")
+        st.info("Scraping läuft...")
         url_content_map = {}
         for url in old_urls:
-            content = scrape_page_content(url)
-            url_content_map[url] = content
-
+            text_content = scrape_page_content(url)
+            url_content_map[url] = text_content
         st.success("Scraping abgeschlossen!")
 
-        # Prompting für OpenAI
+        # Prompting: system
         system_prompt = (
             "Du bist ein hilfreicher Assistent für Website-Relaunches. "
-            "Hier sind die Module mit ihren Feldern (als JSON):\n\n"
-            f"{json.dumps(ALL_MODULES, ensure_ascii=False, indent=2)}\n\n"
-            "Aufgabe: Nutze die alten Seiteninhalte und die neue Sitemap, "
-            "um vorzuschlagen, wie man den Content in die verfügbaren Module "
-            "bestmöglich einbringen kann. Erstelle eine strukturierte Zuordnung "
-            "(in Markdown oder JSON). Zeige pro neuer Seite an, welche Module "
-            "sich anbieten, welche Felder gefüllt werden sollen usw."
+            "Du hast Zugriff auf ein Dictionary mit Modulen und deren Feldern. "
+            "Aufgabe: Ordne die alten Inhalte bestmöglich den neuen Seiten zu, "
+            "und mache Vorschläge, welche Module (aus ALL_MODULES) sich eignen "
+            "und welche Felder wie befüllt werden sollen. "
+            "Hier das JSON mit allen Modulen:\n\n"
+            + json.dumps(ALL_MODULES, ensure_ascii=False, indent=2)
         )
 
-        user_prompt = "**Neue Sitemap:**\n"
-        for newp in new_pages:
-            user_prompt += f"- {newp}\n"
+        # Prompting: user
+        user_prompt = "## Neue Sitemap:\n"
+        for page in new_pages:
+            user_prompt += f"- {page}\n"
 
-        user_prompt += "\n**Alte Seiten mit Content:**\n\n"
+        user_prompt += "\n## Alte Seiten & deren Content:\n"
         for url, txt in url_content_map.items():
-            user_prompt += f"### {url}\n"
-            # ggf. kürzen, falls sehr lang
-            limited_txt = txt[:4000]  # z.B. auf 4000 Zeichen begrenzen
-            user_prompt += limited_txt + "\n\n"
+            user_prompt += f"\n### {url}\n"
+            # Bei Bedarf kürzen, um Tokenlimits zu vermeiden
+            user_prompt += txt[:4000]  # z.B. 4000 Zeichen
+            user_prompt += "\n"
 
-        # OpenAI-Aufruf
+        # OpenAI-Aufruf (o3-mini mit reasoning_effort=high)
         try:
-            with st.spinner("Frage OpenAI nach einem Vorschlag..."):
+            with st.spinner("Frage o3-mini-high nach einem Mapping..."):
                 response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",  # oder "gpt-4"
+                    model="o3-mini-2025-01-31",     # o3-mini Modell
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    temperature=0.2,
+                    max_completion_tokens=600,       # Anpassen nach Bedarf
+                    temperature=0.7,                # Kreativität
+                    reasoning_effort="high"         # Hier das High Reasoning
                 )
-            ai_answer = response["choices"][0]["message"]["content"]
+            ai_answer = response.choices[0].message["content"]
+
             st.success("KI-Antwort erhalten!")
-            st.markdown("### Vorschlag für das Modul-Mapping:")
+            st.markdown("### Vorschlag für das Content-Mapping:")
             st.write(ai_answer)
 
         except Exception as e:
             st.error(f"Fehler beim OpenAI-Aufruf: {e}")
 
 
-# -------------------------------------------------------------------------
-# 5) Streamlit-App Start
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------
+# 5) Start der App
+# ---------------------------------------------------------------
 if __name__ == "__main__":
     main()
