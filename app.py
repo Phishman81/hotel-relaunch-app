@@ -72,7 +72,7 @@ def main():
     **Ablauf**:
     1. Alte Seiten (URLs) eingeben -> werden gescraped.
     2. Neue Sitemap eingeben.
-    3. o3‑mini‑high Modell aufrufen -> Vorschlag für Module & Felder.
+    3. Das o3‑mini‑high Modell aufrufen -> Vorschlag für Module & Felder.
     """)
 
     # Eingabe: Alte URLs
@@ -131,10 +131,11 @@ def main():
             user_prompt += txt[:3000]
             user_prompt += "\n"
 
-        # OpenAI-Aufruf mit openai.ChatCompletion.create(...)
+        # OpenAI-Aufruf mittels neuer Schnittstelle: openai.Chat.create
         try:
             with st.spinner("Frage das Modell (Stream) ..."):
-                response = openai.ChatCompletion.create(
+                # ACHTUNG: Stelle sicher, dass du "openai migrate" ausgeführt hast!
+                response = openai.Chat.create(
                     model="o3-mini-high",   # Verwende das Modell o3-mini-high
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -150,6 +151,7 @@ def main():
                 final_answer = ""
 
                 for chunk in response:
+                    # Bei Streaming werden Teilstücke (Chunks) empfangen
                     delta = chunk["choices"][0]["delta"]
                     if "content" in delta:
                         final_answer += delta["content"]
@@ -158,7 +160,7 @@ def main():
             st.success("Antwort erhalten!")
 
         except Exception as e:
-            st.error(f"Fehler beim OpenAI-Aufruf: {e}")
+            st.error(f"Fehler beim OpenAI-Aufruf: {e}\n\nTipp: Führe 'openai migrate' aus oder pinne die openai-Version.")
 
 # Start der App
 if __name__ == "__main__":
