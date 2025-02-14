@@ -5,15 +5,13 @@ from bs4 import BeautifulSoup
 import json
 
 # -------------------------------------------------------------------------
-# 1) OpenAI-API-Key aus Streamlit-Secrets
-#    => Hinterlege in Streamlit Cloud:
-#       openai_api_key = "sk-..."
+# 1) OpenAI-API-Key
 # -------------------------------------------------------------------------
 openai.api_key = st.secrets["openai_api_key"]
 
 # -------------------------------------------------------------------------
-# 2) Vollständiges ALL_MODULES-Dictionary
-#    (hier beispielhaft abgekürzt – bitte deine Komplettfassung verwenden)
+# 2) Vollständiges ALL_MODULES
+#    (bei dir bitte wirklich ALLE Module, hier beispielhaft gekürzt)
 # -------------------------------------------------------------------------
 ALL_MODULES = {
     "Bild-Text": [
@@ -29,12 +27,9 @@ ALL_MODULES = {
             "Zeichenbegrenzung": "max. 60 Zeichen",
             "Anmerkungen": "Hauptüberschrift"
         },
-        # ... usw. ...
+        # ... etc. ...
     ],
-    "Event-Teaser": [
-        # ...
-    ],
-    # Bitte alle weiteren Module hier 1:1 reinkopieren
+    # ... andere Module ...
     "Zimmer Übersicht": [
         {
             "Feld Name": "Subheading",
@@ -49,15 +44,14 @@ ALL_MODULES = {
             "Anmerkungen": "Haupttitel"
         },
     ],
-    # ...
 }
 
 # -------------------------------------------------------------------------
-# 3) Scraping-Funktion (alte URLs -> Text)
+# 3) Scraping-Funktion (alte Seiten per URL)
 # -------------------------------------------------------------------------
 def scrape_page_content(url: str) -> str:
     """
-    Lädt die angegebene URL und extrahiert den reinen Text.
+    Lädt die angegebene URL, extrahiert den reinen Text und gibt ihn zurück.
     """
     try:
         resp = requests.get(url, timeout=10)
@@ -65,65 +59,64 @@ def scrape_page_content(url: str) -> str:
     except requests.RequestException as e:
         st.warning(f"Fehler beim Abrufen von {url}: {e}")
         return ""
-
     soup = BeautifulSoup(resp.text, "html.parser")
     return soup.get_text(separator="\n").strip()
 
 # -------------------------------------------------------------------------
-# 4) Haupt-App: Streamlit
+# 4) Haupt-App (Streamlit)
 # -------------------------------------------------------------------------
 def main():
     st.title("Website-Relaunch Content-Mapping (OpenAI 1.14.0)")
 
-    st.markdown(
-        """
-        **Ablauf**:
-        1. Gib alte URLs (eine pro Zeile) ein, damit wir deren Inhalte scrapen.
-        2. Gib die neue Sitemap ein (wieder pro Zeile).
-        3. Klick auf "Content mapping generieren":  
-           Wir rufen das Modell *o3-mini-2025-01-31* mit *reasoning_effort=high* via **Stream** auf,
-           um einen Mapping-Vorschlag (Module & Felder) zu erhalten.
-        """
-    )
+    st.markdown("""
+    **Ablauf**:
+    1. Alte Seiten (URLs) eingeben -> werden gescraped.
+    2. Neue Sitemap eingeben.
+    3. o3-mini-2025-01-31 (oder anderes Modell) aufrufen -> Vorschlag für Module & Felder.
+    """)
 
-    # Eingabe: alte URLs
+    # Eingabe: Alte URLs
     st.header("1) Alte Seiten (URLs)")
     old_urls_input = st.text_area(
-        "Alte Seiten-URLs:",
+        "Liste der alten URLs:",
         value="https://example.com/alte-seite-1\nhttps://example.com/alte-seite-2",
         height=150,
     )
 
-    # Eingabe: neue Sitemap
+    # Eingabe: Neue Sitemap
     st.header("2) Neue Seiten (Sitemap)")
     new_sitemap_input = st.text_area(
-        "Neue Sitemap (eine pro Zeile):",
+        "Liste der neuen Seiten (eine pro Zeile):",
         value="Startseite\nÜber uns\nZimmer\nKontakt\nDatenschutz",
         height=150,
     )
 
+    # Button -> Mapping generieren
     if st.button("Content mapping generieren"):
         old_urls = [u.strip() for u in old_urls_input.split("\n") if u.strip()]
         new_pages = [p.strip() for p in new_sitemap_input.split("\n") if p.strip()]
 
         if not old_urls or not new_pages:
-            st.warning("Bitte mindestens 1 alte URL und 1 neue Seite angeben!")
+            st.warning("Bitte mindestens 1 alte URL und 1 neue Seite angeben.")
             return
 
-        st.info("Scraping startet...")
+        st.info("Scrape gestartet...")
         url_content_map = {}
         for url in old_urls:
-            txt_content = scrape_page_content(url)
-            url_content_map[url] = txt_content
-        st.success("Scraping abgeschlossen!")
+            textval = scrape_page_content(url)
+            url_content_map[url] = textval
+        st.success("Scrape abgeschlossen!")
 
         # System-Prompt
         system_prompt = (
-            "Du bist ein Website-Relaunch-Assistent. "
-            "Hier das JSON mit allen verfügbaren Modulen:\n\n"
+            "Du bist ein hilfreicher Assistent für Website-Relaunches. "
+            "Hier alle verfügbaren Module:\n\n"
             + json.dumps(ALL_MODULES, ensure_ascii=False, indent=2)
-            + "\n\nNutze diese Module, um die alten Inhalte bestmöglich "
-            "auf die neue Sitemap zu verteilen (Mapping)."
+            + "\n\n"
+            "Bitte erstelle auf Basis der alten Seiteninhalte (URLs) "
+            "und der neuen Sitemap ein Mapping, welche Module pro neuer Seite "
+            "geeignet sind und wie die Felder (Titel, Subheading, Freitext etc.) "
+            "gefüllt werden sollen."
         )
 
         # User-Prompt
@@ -131,47 +124,46 @@ def main():
         for page in new_pages:
             user_prompt += f"- {page}\n"
 
-        user_prompt += "\n## Alte Seiten:\n"
-        for url, content in url_content_map.items():
-            user_prompt += f"\n### {url}\n"
-            user_prompt += content[:3000]  # ggf. kürzen
+        user_prompt += "\n## Alte Seiten (Content):\n"
+        for url, txt in url_content_map.items():
+            user_prompt += f"### {url}\n"
+            # ggf. Text kürzen, wenn sehr lang
+            user_prompt += txt[:3000]
             user_prompt += "\n"
 
+        # OpenAI-Aufruf mit openai.Chat.create(...)
         try:
-            with st.spinner("Frage o3-mini-2025-01-31 mit reasoning=high (Stream) ..."):
-
-                # NEUE API: openai.chat_completions.create
-                response = openai.chat_completions.create(
-                    model="o3-mini-2025-01-31",
+            with st.spinner("Frage das Modell (Stream) ..."):
+                response = openai.Chat.create(
+                    model="o3-mini-2025-01-31",   # Beispiel: o3-mini
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    stream=True,         # => Streaming!
-                    reasoning_effort="high",
-                    max_completion_tokens=600,
+                    stream=True,  # wir wollen live den Text
+                    reasoning_effort="high",  # nur, wenn dein Modell das unterstützt
+                    max_completion_tokens=500,
                     temperature=0.7
                 )
 
-                # Dynamische Ausgabe in Streamlit
+                # Streaming-Ausgabe
                 streamed_answer_placeholder = st.empty()
                 final_answer = ""
 
                 for chunk in response:
+                    # chunk["choices"] -> array
+                    # chunk["choices"][0]["delta"] -> dict mit partial "content"
                     delta = chunk["choices"][0]["delta"]
                     if "content" in delta:
-                        # Füge neuen Token hinzu und aktualisiere live
                         final_answer += delta["content"]
                         streamed_answer_placeholder.markdown(final_answer)
 
-            st.success("Fertig! Komplette Antwort erhalten.")
+            st.success("Antwort erhalten!")
 
         except Exception as e:
             st.error(f"Fehler beim OpenAI-Aufruf: {e}")
 
 
-# -------------------------------------------------------------------------
-# 5) App starten
-# -------------------------------------------------------------------------
+# Start der App
 if __name__ == "__main__":
     main()
