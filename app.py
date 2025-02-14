@@ -1,5 +1,8 @@
 import streamlit as st
 import openai
+
+openai.api_key = st.secrets["openai_api_key"]
+
 import requests
 from bs4 import BeautifulSoup
 import json
