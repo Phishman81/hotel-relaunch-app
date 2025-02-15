@@ -5,9 +5,11 @@ from bs4 import BeautifulSoup
 import json
 
 # -------------------------------------------------------------------------
-# 1) OpenAI-API-Key aus Streamlit-Secrets
+# 1) DeepSeek-API-Key aus Streamlit-Secrets
 # -------------------------------------------------------------------------
 openai.api_key = st.secrets["openai_api_key"]
+# Setze die Basis-URL der DeepSeek API:
+openai.api_base = "https://api.deepseek.com"
 
 # -------------------------------------------------------------------------
 # 2) ALL_MODULES - Dein vollständiges Dictionary (ohne Kürzungen!)
@@ -1252,16 +1254,15 @@ def scrape_page_content(url: str) -> str:
 # 4) Haupt-App
 # -------------------------------------------------------------------------
 def main():
-    st.title("Website-Relaunch Content-Mapping (ohne reasoning, GPT-4o)")
+    st.title("Website-Relaunch Content-Mapping (mit DeepSeek-Reasoner)")
 
     st.markdown(
         """
         **Vorgehen**:
         1. Gebe im ersten Feld die alten Seiten (URLs) ein, je Zeile eine.
         2. Gebe im zweiten Feld die neue Sitemap ein, wieder je Zeile eine Seite.
-        3. Wir scrapen die alten Seiten, schicken alles an Modell **gpt-4o** 
-           (ohne reasoning-Effort-Parameter), und du bekommst ein Mapping,
-           welche Module (aus ALL_MODULES) zu den neuen Seiten passen 
+        3. Wir scrapen die alten Seiten, schicken alles an das Modell **DeepSeek-Reasoner** 
+           und du erhältst ein Mapping, welche Module (aus ALL_MODULES) zu den neuen Seiten passen 
            und wie du die Felder befüllen könntest.
         """
     )
@@ -1320,16 +1321,16 @@ def main():
             user_prompt += "\n"
 
         try:
-            with st.spinner("Frage GPT-4o (stream) nach einem Mapping-Vorschlag..."):
+            with st.spinner("Frage DeepSeek-Reasoner (stream) nach einem Mapping-Vorschlag..."):
                 response = openai.ChatCompletion.create(
-                    model="gpt-4o",  # falls existiert
+                    model="deepseek-reasoner",  # DeepSeek Reasoning-Modell
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
                     stream=True,          # live Ausgabe
                     max_completion_tokens=600,
-                    temperature=0.7       # kein reasoning_effort mehr
+                    temperature=0.7       # Steuerung der Kreativität
                 )
 
                 # Streaming-Ausgabe
@@ -1337,7 +1338,6 @@ def main():
                 final_answer = ""
 
                 for chunk in response:
-                    # chunk["choices"][0]["delta"].get("content", "")
                     delta = chunk["choices"][0]["delta"]
                     if "content" in delta:
                         final_answer += delta["content"]
@@ -1346,8 +1346,7 @@ def main():
             st.success("Fertig! Mapping-Vorschlag erhalten.")
 
         except Exception as e:
-            st.error(f"Fehler beim OpenAI-Aufruf: {e}")
-
+            st.error(f"Fehler beim DeepSeek-Aufruf: {e}")
 
 # -------------------------------------------------------------------------
 # 5) Streamlit-App starten
