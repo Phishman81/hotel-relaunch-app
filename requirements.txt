@@ -1,7 +1,7 @@
-streamlit
-openai==1.14.0
-requests
-beautifulsoup4
++streamlit
++openai==0.28
++requests
++beautifulsoup4
 
 
 
